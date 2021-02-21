@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - lights - spotlight</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				background-color: #000;
+				margin: 0px;
+				overflow: hidden;
+			}
+
+			#info {
+				position: absolute;
+				top: 0px; width: 100%;
+				color: #ffffff;
+				padding: 5px;
+				font-family: Monospace;
+				font-size: 13px;
+				text-align: center;
+			}
+
+			a {
+				color: #ff0080;
+				text-decoration: none;
+			}
+
+			a:hover {
+				color: #0080ff;
+			}
+
+			.fur-info{
+				position: absolute;
+				display: none;
+				opacity: 0;
+				top: 0;
+				left: 0;
+				height: 100px;
+				width: 200px;
+				background-color: #f7f7f7;
+				/* opacity: 1; */
+				padding-left: 20px;
+				padding-top: 30px;
+				padding-right: 30px;
+				/* display: flex; */
+				transition: 1s;
+				
+			}
+
+			.wardrobe-info{
+				position: absolute;
+				display: none;
+				opacity: 0;
+				top: 0;
+				left: 0;
+				height: 100px;
+				width: 200px;
+				background-color: #f7f7f7;
+				/* opacity: 1; */
+				padding-left: 20px;
+				padding-top: 30px;
+				padding-right: 30px;
+				/* display: flex; */
+				transition: 1s;
+				
+			}
+		
+		
+			.box{
+				position: relative;
+				
+				background-color: white;
+				height: 20px;
+				width: 40px;
+				cursor: pointer;
+				z-index: 10;
+				border:#000 solid 2px;
+				
+			}
+			.bluebox{
+				
+				
+				background-color: red;
+			
+				
+			}
+			.whitebox{
+				background-color: white;	
+			}
+			.yellowbox{
+				background-color: yellow;	
+			}
+			.blackbox{
+				background-color: black;
+			}
+			span{
+				position: relative;
+				display: inline-block;
+				z-index: 10;
+				color: black;
+				margin-left: 10px;
+			}
+		</style>
+	</head>
+	<body>
+
+		<!-- <div id="info">
+			<a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> webgl - spotlight by <a href="http://master-domain.com" target="_blank" rel="noopener">Master James</a><br />
+		</div> -->
+		<div class="fur-info sofa-info">
+			<div class="bluebox box"></div>
+			<div class="whitebox box"></div>
+			<span>Change color</span>
+		</div>
+
+		<div class="fur-info wardrobe-info">
+			<div class="yellowbox box"></div>
+			<!-- <div class="whitebox box"></div>	 -->
+			<div class="blackbox box"></div>	
+		</div>
+
+
+		<script src="./build/three.js"></script>
+		<script src="./js/controls/OrbitControls.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.6.0/gsap.min.js" integrity="sha512-1dalHDkG9EtcOmCnoCjiwQ/HEB5SDNqw8d4G2MKoNwjiwMNeBAkudsBCmSlMnXdsH8Bm0mOd3tl/6nL5y0bMaQ==" crossorigin="anonymous"></script>
+        <script src="./js/postprocessing/EffectComposer.js"></script>
+        <script src="./js/postprocessing/ShaderPass.js"></script>
+        <script src="./js/shaders/CopyShader.js"></script>
+        <script src="./js/postprocessing/RenderPass.js"></script>
+        <script src="./js/postprocessing/BokehPass.js"></script>
+        <script src="./js/shaders/BokehShader.js"></script>
+        <script src="./js/objects/Reflector.js"></script>
+        <script src="./js/shaders/FXAAShader.js"></script>
+        <script src="./js/postprocessing/OutlinePass.js"></script>
+		<script src="./js/loaders/GLTFLoader.js"></script>
+            
+		<script src="./js/libs/dat.gui.min.js"></script>
+		
+
+		<!-- <script src="js/Detector.js"></script> -->
+
+
+
+		<script>
+
+			// if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+
+			var renderer, scene, camera;
+
+			var spotLight, lightHelper, shadowCameraHelper;
+
+			var textureUrls, textures;
+
+			var gui;
+
+            var root, envMat, bed1, cube, wardrobe, sofa2, sofa2child, table, wardrobe, bedTex2Loader, bedTexLoader, wardrobeLoader, wardrobeLoader2;
+
+            var composer;
+
+			var controls;
+
+			var cursorcirc, floorplane;
+
+			var pointX, pointY, pointZ;
+
+			var spotLight;
+
+			var sphere;
+
+			var allowToClick = true;
+
+			var outlinePass;
+			var selectedObjects = [];
+
+			var baseSofa, groupSofa;
+
+			pointY = 227.0885225983062;
+			pointX = 547.9823316758974;
+			pointZ = -202.8120718663041;
+
+
+			const raycaster = new THREE.Raycaster();
+			const mouse = new THREE.Vector2();
+
+			function init() {
+
+				renderer = new THREE.WebGLRenderer({antialias: true,});
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				document.body.appendChild( renderer.domElement );
+				renderer.shadowMap.enabled = true;
+				renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+				// renderer.outputEncoding = THREE.sRGBEncoding;
+
+				// renderer.gammaInput = true;
+				// renderer.gammaOutput = true;
+                composer = new THREE.EffectComposer( renderer );
+             
+				
+
+
+
+				scene = new THREE.Scene();
+                scene.background = new THREE.Color(0xffffff)
+                // scene.fog = new THREE.FogExp2(0x060105, 0.05);
+                // scene.background = new THREE.Color(0xffffff)
+
+			
+
+				camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 3000 );
+			
+				// camera.position.set( 547.9823316758974, 227.0885225983062, -202.8120718663041);
+				camera.position.set( -464, 175, 561);
+			
+			
+	
+		
+				camera.updateProjectionMatrix();
+
+
+				const TextLoader = new THREE.CubeTextureLoader();
+				TextLoader.setPath( 'textures/envMat/' );
+
+				envMat = TextLoader.load( [ 'px.jpg', 'nx.jpg', 'py.jpg', 'ny.jpg', 'pz.jpg', 'nz.jpg' ] );
+				scene.background = envMat;
+			
+				
+
+				controls = new THREE.MapControls( camera, renderer.domElement );
+				controls.addEventListener( 'change', render );
+			
+			
+				controls.maxDistance = 20;
+				controls.minPolarAngle = (Math.PI / 2) - 0.3; // radians
+		 		 controls.maxPolarAngle = (Math.PI / 2) - 0.3; // radians
+				controls.enableDamping = true;
+				controls.enablePan = false;
+				controls.dampingFactor = 0.05;
+				controls.screenSpacePanning = false;
+			
+			
+				// controls.update();
+				// camera.updateProjectionMatrix();
+
+				const light = new THREE.PointLight( 0x696bf5, 1, 1000 );
+				light.position.set(  -479, 127, -312 );
+				// light.castShadow = true;
+				// light.shadow.bias = 0.0004;
+				scene.add( light );
+
+				const light2 = new THREE.PointLight( 0x696bf5, 0.2, 1000 );
+				light2.position.set(  -46, 300, 150 );
+				// light.castShadow = true;
+				// light.shadow.bias = 0.0004;
+				scene.add( light2 );
+			
+			
+				spotLight = new THREE.SpotLight( 0x696bf5 );
+					
+					spotLight.position.set( 68, 255, -830);
+					spotLight.castShadow = true;
+					spotLight.angle = 0.7;
+					spotLight.shadow.mapSize.width = 712;
+					spotLight.shadow.mapSize.height = 712;
+					spotLight.shadow.bias = -0.0004;
+				
+					spotLight.shadow.camera.near = 0.9;
+					spotLight.shadow.camera.far = 500;
+					spotLight.penumbra = 1;
+					scene.add( spotLight );
+
+					// const spotLightHelper = new THREE.SpotLightHelper( spotLight );
+					// scene.add( spotLightHelper );
+		
+
+				var ambient = new THREE.AmbientLight( 0xffffff, 0.8);
+				scene.add( ambient );
+
+				
+
+                var renderPass = new THREE.RenderPass(scene, camera);
+                composer.addPass( renderPass );
+                renderPass.renderToScreen = true;
+
+                
+               const effectFXAA = new THREE.ShaderPass( THREE.FXAAShader );
+                effectFXAA.uniforms[ 'resolution' ].value.x = 1 / ( window.innerWidth * window.devicePixelRatio );
+                effectFXAA.uniforms[ 'resolution' ].value.y = 1 / ( window.innerHeight * window.devicePixelRatio );
+                composer.addPass( effectFXAA ); 
+
+                // const bokehPass = new THREE.BokehPass( scene, camera, {
+				// 	focus: 500.0,
+				// 	aperture: 1,
+				// 	maxblur: 0.0150,
+				// 	// focus: 0,
+				// 	// aperture: 0,
+				// 	// maxblur: 0,
+
+				// 	width: window.innerWidth * 2,
+				// 	height: window.innerHeight * 2
+				// } );
+               
+				
+				
+
+                // composer.addPass( bokehPass)
+                // bokehPass.renderToScreen = true;
+ 
+			
+                outlinePass = new THREE.OutlinePass( new THREE.Vector2( window.innerWidth, window.innerHeight ), scene, camera );
+				outlinePass.edgeStrength = 16;
+				outlinePass.edgeThickness = 1;
+				outlinePass.visibleEdgeColor = new THREE.Color(0xffffff);
+				composer.addPass( outlinePass );
+				outlinePass.renderToScreen = true;
+
+				const bokehPass = new THREE.BokehPass( scene, camera, {
+					focus: 500.0,
+					aperture: 1,
+					maxblur: 0.0008,
+					// focus: 0,
+					// aperture: 0,
+					// maxblur: 0,
+
+					width: window.innerWidth * 2,
+					height: window.innerHeight * 2
+				} );
+               
+				
+				
+
+                composer.addPass( bokehPass)
+                bokehPass.renderToScreen = true;
+               
+
+           
+			
+
+                const gltfLoader = new THREE.GLTFLoader();
+                    gltfLoader.load('./textures/apartment/scene.gltf', (gltf) => {
+                    root = gltf.scene;
+                    //   root.scale.set(0.04, 0.04, 0.04) // scale here
+                    root.position.set(0, 0, 0)
+                    root.traverse(function(node) {
+
+                        if (node instanceof THREE.Mesh) {
+                        node.castShadow = true;
+                        node.receiveShadow = true;
+                        }
+
+						// if (node.isMesh){
+						// 	node.castShadow = true;
+                        // 		node.receiveShadow = true;
+						// }
+                    
+                    });
+                    scene.add(root);
+                });
+
+				gltfLoader.load('./textures/bed1/scene.gltf', (gltf) => {
+                    bed1 = gltf.scene;
+                      bed1.scale.set(3, 3, 3) // scale here
+                    bed1.position.set(-14, 1, 483)
+					bed1.rotation.y = Math.PI / 1;
+                    bed1.traverse(function(node) {
+
+                        if (node instanceof THREE.Mesh) {
+						bed1.castShadow = true;
+                        bed1.receiveShadow = true;
+                        }
+
+						// if (node.isMesh){
+						// 	node.castShadow = true;
+                        // 		node.receiveShadow = true;
+						// }
+                    
+                    });
+                    scene.add(bed1);
+                });
+				wardrobeLoader2 = new THREE.TextureLoader().load('./textures/table42/textures/wardrobeorig.png');
+				gltfLoader.load('./textures/table42/scene.gltf', (gltf) => {
+                    wardrobe = gltf.scene;
+                      wardrobe.scale.set(122, 122, 122) // scale here
+					wardrobe.position.set(553, 0, -9)
+					wardrobe.rotation.y = 130.4;
+                    wardrobe.traverse(function(node) {
+
+                        if (node instanceof THREE.Mesh) {
+							wardrobe.castShadow = true;
+							wardrobe.receiveShadow = true;
+							node.material.map = wardrobeLoader2;
+                        }
+
+						// if (node.isMesh){
+						// 	node.castShadow = true;
+                        // 		node.receiveShadow = true;
+						// }
+                    
+                    });
+                    scene.add(wardrobe);
+                });
+
+			
+
+				gltfLoader.load('./index3room/sofanew/scene.gltf', (gltf) => {
+                    sofa2 = gltf.scene;
+					sofa2.scale.set(180, 180, 180) // scale here
+					sofa2.position.set(200, 55, -342)
+					// sofa.rotation.y = 130.4;
+					sofa2.rotation.y = 130;
+					sofa2.name = "sofa";
+                    sofa2.traverse(function(node) {
+
+                        if (node instanceof THREE.Mesh) {
+							sofa2.castShadow = true;
+							sofa2.receiveShadow = true;
+
+                        }
+						// console.log(node.getObjectByName('floor'))
+						
+						sofa2child = node.getObjectByName('defaultMaterial');
+						// control meshes
+						// if(floorsofa){
+						// 	// console.log(floorsofa.children)
+						// 	floorsofa.children[0].material.transparent = true;
+						// 	floorsofa.children[0].material.opacity = 0;
+						// 	floorsofa.children[0].material.needsUpdate = true;
+						// }	
+			
+					
+						
+						// if (node.isMesh){
+						// 	node.castShadow = true;
+                        // 		node.receiveShadow = true;
+						// }
+                    
+                    });
+                    scene.add(sofa2);
+                });
+
+
+
+
+				gltfLoader.load('./textures/der_tisch/scene.gltf', (gltf) => {
+                    table = gltf.scene;
+					// table.scale.set(0.5, 0.5, 0.5) // scale here
+					table.position.set(-40, 2, -434)
+				
+					table.rotation.y = 130;
+                    table.traverse(function(node) {
+
+                        if (node instanceof THREE.Mesh) {
+							table.castShadow = true;
+							// table.receiveShadow = true;
+                        }
+					
+                    
+                    });
+                    scene.add(table);
+                });
+
+
+				gltfLoader.load('./textures/die_lampe/scene.gltf', (gltf) => {
+                    lamp = gltf.scene;
+					lamp.scale.set(150, 150, 150) // scale here
+					lamp.position.set(-479, 1, -312)
+			
+                    lamp.traverse(function(node) {
+
+                        if (node instanceof THREE.Mesh) {
+							lamp.castShadow = true;
+							// table.receiveShadow = true;
+                        }
+					
+                    
+                    });
+                    scene.add(lamp);
+                });
+
+
+				gltfLoader.load('./textures/die_tur/scene.gltf', (gltf) => {
+                    tur = gltf.scene;
+					tur.scale.set(1, 1.08, 2) // scale here
+					tur.position.set(-594, 108, 203)
+				
+                    tur.traverse(function(node) {
+
+                        if (node instanceof THREE.Mesh) {
+							tur.castShadow = true;
+							// table.receiveShadow = true;
+                        }
+					
+                    
+                    });
+                    scene.add(tur);
+                });
+
+
+				
+
+
+		
+
+				const floorgeometry = new THREE.PlaneGeometry( 1225, 1225, 1 );
+				const floormaterial = new THREE.MeshBasicMaterial( {color: 0xe78205, side: THREE.DoubleSide, transparent: true, opacity: 0} );
+				floorplane = new THREE.Mesh( floorgeometry, floormaterial );
+				scene.add( floorplane );
+				floorplane.userData = { name: "planefloor" };
+				floorplane.rotation.x = Math.PI / 2;
+				floorplane.position.set(0, 1, 0);
+				floorplane.name = "poli";
+                
+				window.addEventListener("keydown", function(event) {
+					if(event.keyCode === 39){
+						console.log(camera.position)
+						console.log(root.children)
+					}
+				});
+				document.querySelector(".bluebox").addEventListener("click", () => {
+					sofa2.traverse(function(node) {
+						// var bedTex2Loader = new THREE.TextureLoader().load('./index3room/sofanew/changed2.png');
+						if(sofa2){
+							node.getObjectByName('defaultMaterial').material.map = bedTex2Loader ;
+						node.getObjectByName('defaultMaterial').material.needsUpdate = true;
+						node.getObjectByName('defaultMaterial_2').material.map = bedTex2Loader ;
+						node.getObjectByName('defaultMaterial_2').material.needsUpdate = true;
+						node.getObjectByName('defaultMaterial_3').material.map = bedTex2Loader ;
+						node.getObjectByName('defaultMaterial_3').material.needsUpdate = true;
+						node.getObjectByName('defaultMaterial_4').material.map = bedTex2Loader ;
+						node.getObjectByName('defaultMaterial_4').material.needsUpdate = true;
+						node.getObjectByName('defaultMaterial_5').material.map = bedTex2Loader ;
+						node.getObjectByName('defaultMaterial_5').material.needsUpdate = true;
+						}
+						
+						// node.getObjectByName('defaultMaterial_6').material.map = bedTex2Loader ;
+
+				
+					//  baseSofa = node.getObjectByName('sofa_1');
+			
+			
+					
+				
+
+					// console.log(groupSofa)
+
+
+					// if(node.name == "sofa_1"){
+					// baseSofa.material.map = bedTex2Loader
+				
+					
+					// }
+				})
+
+
+				
+				})
+
+				document.querySelector(".wardrobe-info .yellowbox").addEventListener("click", () => {
+					wardrobe.traverse(function(node) {
+				
+						// if(wardrobe){
+						// // 	node.getObjectByName('mesh_0').material.map = wardrobeLoader ;
+						// // node.getObjectByName('mesh_0').material.needsUpdate = true;
+						// 	node.material.map = wardrobeLoader ;
+						// 	node.material.needsUpdate = true;
+		
+						// }
+						if (node instanceof THREE.Mesh) {
+							node.material.map = wardrobeLoader;
+						}
+						
+				
+				})
+
+
+				
+				})
+
+				document.querySelector(".wardrobe-info .blackbox").addEventListener("click", () => {
+					wardrobe.traverse(function(node) {
+				
+						// if(wardrobe){
+						// 	node.material.map = wardrobeLoader2 ;
+						// node.material.needsUpdate = true;
+		
+						// }
+						// node instanceof THREE.Mesh-it aris swori gza texturis shecvlit da ara ise rogorc sofaze shevcvale
+						if (node instanceof THREE.Mesh) {
+							node.material.map = wardrobeLoader2;
+						}
+						
+				
+				})
+
+
+				
+				})
+
+
+
+				document.querySelector(".whitebox").addEventListener("click", () => {
+					sofa2.traverse(function(node) {
+						// bedTexLoader = new THREE.TextureLoader().load('./index3room/sofanew/changed.png');
+						if(sofa2){
+							node.getObjectByName('defaultMaterial').material.map = bedTexLoader ;
+						node.getObjectByName('defaultMaterial').material.needsUpdate = true;
+						node.getObjectByName('defaultMaterial_2').material.map = bedTexLoader ;
+						node.getObjectByName('defaultMaterial_2').material.needsUpdate = true;
+						node.getObjectByName('defaultMaterial_3').material.map = bedTexLoader ;
+						node.getObjectByName('defaultMaterial_3').material.needsUpdate = true;
+						node.getObjectByName('defaultMaterial_4').material.map = bedTexLoader ;
+						node.getObjectByName('defaultMaterial_4').material.needsUpdate = true;
+						node.getObjectByName('defaultMaterial_5').material.map = bedTexLoader ;
+						node.getObjectByName('defaultMaterial_5').material.needsUpdate = true;
+						}
+						
+						// node.getObjectByName('defaultMaterial_6').material.map = bedTex2Loader ;
+
+				
+					//  baseSofa = node.getObjectByName('sofa_1');
+			
+			
+					
+				
+
+					// console.log(groupSofa)
+
+
+					// if(node.name == "sofa_1"){
+					// baseSofa.material.map = bedTex2Loader
+				
+					
+					// }
+				})
+
+
+				
+				})
+				window.addEventListener("keydown", function(event) {
+					if(event.keyCode === 37){
+					// sofa.traverse(function(node) {
+					// 	var bedTex2Loader = new THREE.TextureLoader().load('./textures/das_sofa/textures/changed.png');
+
+					// 	// bedTex2Loader.setPath( 'textures/bed1/textures3/' );
+
+					// 	// let bedTex2 = bedTex2Loader.load( [ 'Bed_Blanket_baseColor.jpeg', 'Bed_Blanket_metallicRoughness.png', 'Bed_Blanket_normal.png', 'Bed_DW_baseColor.jpeg', 'Bed_DW_metallicRoughness.png', 'Bed_DW_normal.png', 'M_Mattress_baseColor.jpeg', 'M_Mattress_metallicRoughness.png', 'M_Mattress_normal.png', 'material_5_baseColor.jpeg', 'material_5_metallicRoughness.png', 'material_5_normal.png', 'material_baseColor.jpeg', 'material_metallicRoughness.png', 'material_normal.png' ] );
+                    
+					
+
+					// // 	// control meshes
+					// // 	if(floorsofa){
+					// // 		console.log(floorsofa.children)
+					// // 		floorsofa.children[0].material.transparent = true;
+					// // 		floorsofa.children[0].material.opacity = 0;
+					// // 		floorsofa.children[0].material.needsUpdate = true;
+					// // 	}	
+
+					//  baseSofa = node.getObjectByName('sofa_1');
+			
+			
+					
+					// // if(node.isMesh) baseSofa.material.map = bedTex2Loader;
+
+					// console.log(groupSofa)
+
+
+					// if(node.name == "sofa_1"){
+					// baseSofa.material.map = bedTex2Loader
+					// // baseSofa2.material.map = bedTex2Loader;
+					
+					// }
+					// if(node.name == "cushions_1"){
+					// 	node.getObjectByName('cushions_1').material.map = bedTex2Loader
+					// // baseSofa2.material.map = bedTex2Loader;
+					
+					// }
+					// })
+					}
+				});
+
+				const cursorgeo = new THREE.CircleGeometry( 25, 25 );
+				const cursormat = new THREE.MeshBasicMaterial( { color: 0xffffff, side: THREE.DoubleSide,  transparent: true, opacity: 0.5} );
+				cursorcirc = new THREE.Mesh( cursorgeo, cursormat );
+				cursorcirc.rotation.x = Math.PI / 2;
+				cursorcirc.position.set(0, 40, 0);
+				cursorcirc.name = "circle";
+				scene.add( cursorcirc );
+				
+				const spheregeometry = new THREE.SphereGeometry( 5, 32, 32 );
+				const spherematerial = new THREE.MeshBasicMaterial( {color: 0xffff00, transparent: true, opacity: 0} );
+				sphere = new THREE.Mesh( spheregeometry, spherematerial );
+				sphere.position.set(0, 170, 0)
+				scene.add( sphere );
+
+				controls.target.set(-448, 170, 319);
+
+				// const cubegeometry = new THREE.BoxGeometry( 30, 30, 30 );
+				// const cubematerial = new THREE.MeshBasicMaterial( {color: 0x00ff00} );
+				// cube = new THREE.Mesh( cubegeometry, cubematerial );
+				// cube.position.set(0, 80, 0)
+				// scene.add( cube );
+
+
+				window.addEventListener( 'mousemove', onMouseMove );
+				window.addEventListener( 'click', onMouseClick );
+				window.addEventListener( 'resize', onResize, false );
+
+			}
+
+
+			// function buildGui() {
+
+			// 		gui = new dat.gui.GUI();
+
+			// 		const params = {
+			// 			// 'light color': spotLight.color.getHex(),
+			// 			intensity: spotLight.intensity,
+			// 			distance: spotLight.distance,
+			// 			angle: spotLight.angle,
+			// 			penumbra: spotLight.penumbra,
+			// 			decay: spotLight.decay,
+			// 			focus: spotLight.shadow.focus
+			// 		};
+
+			// 		// gui.addColor( params, 'light color' ).onChange( function ( val ) {
+
+			// 		// 	spotLight.color.setHex( val );
+			// 		// 	render();
+
+			// 		// } );
+
+			// 		gui.add( params, 'intensity', 0, 2 ).onChange( function ( val ) {
+
+			// 			spotLight.intensity = val;
+			// 			render();
+
+			// 		} );
+
+
+			// 		gui.add( params, 'distance', 50, 200 ).onChange( function ( val ) {
+
+			// 			spotLight.distance = val;
+			// 			render();
+
+			// 		} );
+
+			// 		gui.add( params, 'angle', 0, Math.PI / 3 ).onChange( function ( val ) {
+
+			// 			spotLight.angle = val;
+			// 			render();
+
+			// 		} );
+
+			// 		gui.add( params, 'penumbra', 0, 1 ).onChange( function ( val ) {
+
+			// 			spotLight.penumbra = val;
+			// 			render();
+
+			// 		} );
+
+			// 		gui.add( params, 'decay', 1, 2 ).onChange( function ( val ) {
+
+			// 			spotLight.decay = val;
+			// 			render();
+
+			// 		} );
+
+			// 		gui.add( params, 'focus', 0, 1 ).onChange( function ( val ) {
+
+			// 			spotLight.shadow.focus = val;
+			// 			render();
+
+			// 		} );
+
+			// 		gui.open();
+
+			// 					}
+
+			function onResize() {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				composer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+			function addSelectedObject( object ) {
+
+				selectedObjects = [];
+				selectedObjects.push( object );
+
+				}
+			function onMouseMove( event ) {
+
+			mouse.x = ( event.clientX / renderer.domElement.clientWidth ) * 2 - 1;
+			mouse.y = - ( event.clientY / renderer.domElement.clientHeight ) * 2 + 1;
+			raycaster.setFromCamera( mouse, camera );
+
+			// See if the ray from the camera into the world hits one of our meshes
+			const intersects = raycaster.intersectObject( floorplane );
+
+			// Toggle rotation bool for meshes that we clicked
+			if ( intersects.length > 0 ) {
+
+				cursorcirc.position.set( 0, 0, 0 );
+				// cursorcirc.rotation.x = Math.PI / 2;
+				// cursorcirc.lookAt( intersects[ 0 ].face.normal );
+
+				cursorcirc.position.copy( intersects[ 0 ].point );
+				cursorcirc.position.y = 2;
+				// console.log("hey")
+
+				// console.log(intersects[ 0 ].point)
+
+
+
+				sphere.position.set( 0, 170, 0 );
+				// cursorcirc.rotation.x = Math.PI / 2;
+				// cursorcirc.lookAt( intersects[ 0 ].face.normal );
+
+				sphere.position.copy( intersects[ 0 ].point );
+				sphere.position.y = 170;
+				
+			}
+
+
+			
+		
+		if(sofa2){
+			sofa2.traverse(function(node) {
+
+			if (node instanceof THREE.Mesh) {
+				sofa2.castShadow = true;
+				sofa2.receiveShadow = true;
+
+			}
+			// console.log(node.getObjectByName('floor'))
+
+			sofa2child = node.getObjectByName('defaultMaterial');
+
+			// console.log(sofa2child)
+			});
+
+			const intersectsSofa = raycaster.intersectObjects( sofa2.children, true );
+			const intersectsBed1 = raycaster.intersectObjects( bed1.children, true );
+			const intersectsTable = raycaster.intersectObjects( table.children, true);
+			const intersectsWardrobe = raycaster.intersectObjects( wardrobe.children, true);
+
+			if ( intersectsSofa.length > 0 ) {
+				if(intersectsSofa[ 0 ].object.name == "defaultMaterial_3"){
+					const selectedObject = intersectsSofa[ 0 ].object;
+				addSelectedObject( selectedObject );
+				outlinePass.selectedObjects = selectedObjects;
+				}
+				
+				// console.log(sofa2.children)
+		
+			
+			
+
+				// console.log(bed1)
+
+			} else if ( intersectsBed1.length > 0 ) {
+				
+				const selectedObject = intersectsBed1[ 0 ].object;
+				addSelectedObject( selectedObject );
+				outlinePass.selectedObjects = selectedObjects;
+				// console.log("bed1")
+
+				// console.log(bed1)
+
+			} 
+			else if ( intersectsTable.length > 0 ) {
+				
+				const selectedObject = intersectsTable[ 0 ].object;
+				addSelectedObject( selectedObject );
+				outlinePass.selectedObjects = selectedObjects;
+				console.log("table")
+
+				// console.log(bed1)
+
+			} 
+			else if ( intersectsWardrobe.length > 0 ) {
+				
+				const selectedObject = intersectsWardrobe[ 0 ].object;
+				addSelectedObject( selectedObject );
+				outlinePass.selectedObjects = selectedObjects;
+				console.log("wardrobe")
+
+				// console.log(bed1)
+
+			}else {
+				outlinePass.selectedObjects = [];
+			}
+		}	
+
+		// if(bed1){
+		// 	const intersectsBed1 = raycaster.intersectObjects( bed1.children, true );
+		// 	if ( intersectsBed1.length > 0 ) {
+				
+		// 		const selectedObject = intersectsBed1[ 0 ].object;
+		// 		addSelectedObject( selectedObject );
+		// 		outlinePass.selectedObjects = selectedObjects;
+		// 		console.log("bed1")
+
+		// 		// console.log(bed1)
+
+		// 	} else {
+		// 		outlinePass.selectedObjects = [];
+		// 	}
+		// }	
+		
+		
+
+
+		}
+
+			function onMouseClick( event ) {
+
+				mouse.x = ( event.clientX / renderer.domElement.clientWidth ) * 2 - 1;
+				mouse.y = - ( event.clientY / renderer.domElement.clientHeight ) * 2 + 1;
+				raycaster.setFromCamera( mouse, camera );
+				event.preventDefault();
+				// See if the ray from the camera into the world hits one of our meshes
+
+				const intersectsFur = raycaster.intersectObjects( scene.children, true );
+				if (intersectsFur[0]){
+				// console.log(intersectsFur[0].object.userData.name)	
+
+
+				// console.log(intersectsFur[0].object)
+
+				// if(intersectsFur[ 0 ].object.name == "sofa" ){
+				// 	console.log("hi")
+				// }	else {
+				// 	 console.log("not sofa")
+				// }
+
+				// 	if(intersectsFur[ 0 ].object.userData.name == planefloor ){
+				// 	console.log("hi")
+				// }	else {
+				// 	console.log("not sofa")
+				// }
+					// let sofa = intersectsFur[ 0 ].object.name == "sofa";
+
+					console.log(scene.children)
+					
+					if(intersectsFur[ 0 ].object.name == "mesh_0" ){
+						wardrobeLoader = new THREE.TextureLoader().load('./textures/table42/textures/changedyel.png');
+	
+						// wardrobeLoader3 = new THREE.TextureLoader().load('./index3room/sofanew/changed.png');
+					document.querySelector(".wardrobe-info").style.display = "flex";
+					setTimeout(() => {
+						document.querySelector(".wardrobe-info").style.opacity = "1";
+					}, 50);
+					console.log("I clicked")
+			
+					} else {
+						document.querySelector(".wardrobe-info").style.opacity = "0";
+					setTimeout(() => {
+						document.querySelector(".wardrobe-info").style.display = "none";
+						
+					}, 50);
+				
+						console.log("I did naaaht")
+					}
+
+
+
+
+
+
+
+
+					if(intersectsFur[ 0 ].object.name == "defaultMaterial_3" || intersectsFur[ 0 ].object.name == "defaultMaterial_4" || intersectsFur[ 0 ].object.name == "defaultMaterial" || intersectsFur[ 0 ].object.name == "defaultMaterial_2" || intersectsFur[ 0 ].object.name == "defaultMaterial_5" || intersectsFur[ 0 ].object.name == "defaultMaterial_6"){
+						bedTex2Loader = new THREE.TextureLoader().load('./index3room/sofanew/changed2.png');
+						bedTexLoader = new THREE.TextureLoader().load('./index3room/sofanew/changed.png');
+					document.querySelector(".sofa-info").style.display = "flex";
+					setTimeout(() => {
+						document.querySelector(".sofa-info").style.opacity = "1";
+					}, 50);
+					console.log("I clicked")
+			
+					} else {
+						document.querySelector(".sofa-info").style.opacity = "0";
+					setTimeout(() => {
+						document.querySelector(".sofa-info").style.display = "none";
+						
+					}, 50);
+				
+						console.log("I did naaaht")
+					}
+				
+				}
+
+
+
+				const intersects = raycaster.intersectObjects( scene.children, true );
+
+
+				// Toggle rotation bool for meshes that we clicked
+				if ( intersects.length > 0 && allowToClick == true ) {
+
+					console.log(intersects[0].object)
+					// console.log(scene.children)
+					// console.log("hey")
+				if(intersects[ 0 ].object.name == "circle" ){
+					console.log(intersects[ 0 ].point.x)
+					console.log(pointY)
+					console.log(intersects[ 0 ].point.z)
+					pointX = intersects[ 0 ].point.x;
+					pointY = intersects[ 0 ].point.y;
+					pointZ = intersects[ 0 ].point.z;
+
+			
+					
+					controls.enablePan = false;
+					controls.enableRotate = false;
+					allowToClick = false;
+					setTimeout(() => {
+						controls.enablePan = true;
+					controls.enableRotate = true;
+					allowToClick = true;
+					}, 1800);
+				
+					gsap.to(controls.target, {
+						duration: 1.8,
+						x: sphere.position.x,
+						y: sphere.position.y,
+						z: sphere.position.z ,
+						onUpdate: function() {
+					camera.updateProjectionMatrix;
+					controls.update();
+					
+					}
+										
+					})
+				}
+					
+				
+			
+					
+				}
+
+				}
+          
+
+			function render() {
+
+				
+		
+
+
+
+				// renderer.render( scene, camera );
+                composer.render();
+			}
+
+			
+			init();
+			// buildGui();
+			
+
+			animate();
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+				
+				controls.update();
+               
+				render();
+
+			}
+
+			
+
+		</script>
+
+	</body>
+
+</html>
